@@ -49,6 +49,11 @@ export default function StudentDetail() {
     await supabase.from("students").update({ general_notes: notes }).eq("id", studentId);
     alert("Notes saved!");
   }
+    async function deleteStudent() {
+    if (!confirm(`Delete ${student.name}? This removes all their sessions and cannot be undone.`)) return;
+    await supabase.from("students").delete().eq("id", studentId);
+    router.push("/dashboard");
+  }
 
   if (!student) return <p style={{ padding: 40, fontFamily: "system-ui" }}>Loading...</p>;
 
@@ -58,6 +63,7 @@ export default function StudentDetail() {
   return (
     <div style={{ maxWidth: 720, margin: "40px auto", fontFamily: "system-ui", padding: 20 }}>
       <button onClick={() => router.push("/dashboard")} style={{ padding: "6px 12px", cursor: "pointer", marginBottom: 16 }}>← All students</button>
+            <button onClick={deleteStudent} style={{ padding: "6px 12px", cursor: "pointer", marginBottom: 16, marginLeft: 8, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 6, background: "#fff" }}>Delete student</button>
 
       <h1 style={{ fontSize: 26 }}>{student.name}</h1>
       <div style={{ color: "#888" }}>{student.grade} · {student.subject}</div>
