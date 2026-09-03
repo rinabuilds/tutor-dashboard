@@ -19,6 +19,7 @@ export default function StudentDetail() {
   const [sessionNotes, setSessionNotes] = useState("");
   const [homework, setHomework] = useState("");
   const [points, setPoints] = useState(5);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -37,11 +38,36 @@ export default function StudentDetail() {
 
   async function addSession() {
     if (!date || !topic.trim()) return;
-        await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework });
-    // award points
-    await supabase.from("point_events").insert({ student_id: studentId, amount: points, reason: `Session: ${topic}` });
-    await supabase.from("students").update({ points: (student.points || 0) + points }).eq("id", studentId);
-        setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setPoints(5);
+    if (editingId) {
+      await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework }).eq("id", editingId);
+      setEditingId(null);
+    } else {
+      await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework });
+      await supabase.from("point_events").insert({ student_id: studentId, amount: points, reason: `Session: ${topic}` });
+      await supabase.from("students").update({ points: (student.points || 0) + points }).eq("id", studentId);
+    }
+    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setPoints(5);
+    loadAll();
+  }
+
+  function startEdit(sess: any) {
+    setEditingId(sess.id);
+    setDate(sess.date);
+    setTopic(sess.topic);
+    setRating(sess.rating);
+    setSessionNotes(sess.notes || "");
+    setHomework(sess.homework || "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setPoints(5);
+  }
+
+  async function deleteSession(id: string) {
+    if (!confirm("Delete this session?")) return;
+    await supabase.from("sessions").delete().eq("id", id);
     loadAll();
   }
 
@@ -49,7 +75,8 @@ export default function StudentDetail() {
     await supabase.from("students").update({ general_notes: notes }).eq("id", studentId);
     alert("Notes saved!");
   }
-    async function deleteStudent() {
+
+  async function deleteStudent() {
     if (!confirm(`Delete ${student.name}? This removes all their sessions and cannot be undone.`)) return;
     await supabase.from("students").delete().eq("id", studentId);
     router.push("/dashboard");
@@ -63,7 +90,7 @@ export default function StudentDetail() {
   return (
     <div style={{ maxWidth: 720, margin: "40px auto", fontFamily: "system-ui", padding: 20 }}>
       <button onClick={() => router.push("/dashboard")} style={{ padding: "6px 12px", cursor: "pointer", marginBottom: 16 }}>← All students</button>
-            <button onClick={deleteStudent} style={{ padding: "6px 12px", cursor: "pointer", marginBottom: 16, marginLeft: 8, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 6, background: "#fff" }}>Delete student</button>
+      <button onClick={deleteStudent} style={{ padding: "6px 12px", cursor: "pointer", marginBottom: 16, marginLeft: 8, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 6, background: "#fff" }}>Delete student</button>
 
       <h1 style={{ fontSize: 26 }}>{student.name}</h1>
       <div style={{ color: "#888" }}>{student.grade} · {student.subject}</div>
@@ -76,7 +103,7 @@ export default function StudentDetail() {
       </div>
 
       <div style={box}>
-        <h3>Log a session</h3>
+        <h3>{editingId ? "Edit session" : "Log a session"}</h3>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={input} />
         <input placeholder="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} style={input} />
         <label style={{ fontSize: 14 }}>Progress: </label>
@@ -87,11 +114,14 @@ export default function StudentDetail() {
           <option value={4}>Strong</option>
           <option value={5}>Excellent</option>
         </select>
-        <label style={{ fontSize: 14, marginLeft: 16 }}>Points: </label>
-        <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: 60, padding: 6, marginLeft: 8 }} />
+        {!editingId && <>
+          <label style={{ fontSize: 14, marginLeft: 16 }}>Points: </label>
+          <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: 60, padding: 6, marginLeft: 8 }} />
+        </>}
         <textarea placeholder="Session notes (parents see these)" value={sessionNotes} onChange={(e) => setSessionNotes(e.target.value)} style={{ ...input, minHeight: 60, marginTop: 8 }} />
-                <textarea placeholder="Homework given (e.g. Worksheet pg 12–14)" value={homework} onChange={(e) => setHomework(e.target.value)} style={{ ...input, minHeight: 50, marginTop: 8 }} />
-        <button onClick={addSession} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save session (+{points} pts)</button>
+        <textarea placeholder="Homework given (e.g. Worksheet pg 12–14)" value={homework} onChange={(e) => setHomework(e.target.value)} style={{ ...input, minHeight: 50, marginTop: 8 }} />
+        <button onClick={addSession} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>{editingId ? "Update session" : `Save session (+${points} pts)`}</button>
+        {editingId && <button onClick={cancelEdit} style={{ padding: "8px 16px", marginLeft: 8, cursor: "pointer" }}>Cancel</button>}
       </div>
 
       <h3>Session history</h3>
@@ -104,7 +134,11 @@ export default function StudentDetail() {
           </div>
           <div style={{ fontSize: 14, color: "#555", margin: "4px 0" }}>Progress: {["", "Needs work", "Developing", "On track", "Strong", "Excellent"][sess.rating]}</div>
           <p style={{ margin: 0, fontSize: 14 }}>{sess.notes}</p>
-                    {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
+          {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
+          <div style={{ marginTop: 10 }}>
+            <button onClick={() => startEdit(sess)} style={{ padding: "4px 10px", cursor: "pointer", marginRight: 8, fontSize: 13 }}>Edit</button>
+            <button onClick={() => deleteSession(sess.id)} style={{ padding: "4px 10px", cursor: "pointer", fontSize: 13, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 4, background: "#fff" }}>Delete</button>
+          </div>
         </div>
       ))}
     </div>
