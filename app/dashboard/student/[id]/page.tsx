@@ -76,10 +76,15 @@ export default function StudentDetail() {
     alert("Notes saved!");
   }
 
-  async function deleteStudent() {
+    async function deleteStudent() {
     if (!confirm(`Delete ${student.name}? This removes all their sessions and cannot be undone.`)) return;
-    await supabase.from("students").delete().eq("id", studentId);
-    router.push("/dashboard");
+    const { error } = await supabase.from("students").delete().eq("id", studentId);
+    if (error) {
+      alert("Delete failed: " + error.message);
+      console.log("Delete error:", error);
+    } else {
+      router.push("/dashboard");
+    }
   }
 
   if (!student) return <p style={{ padding: 40, fontFamily: "system-ui" }}>Loading...</p>;
