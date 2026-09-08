@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [grade, setGrade] = useState("");
   const [gradeIsOther, setGradeIsOther] = useState(false);
   const [subject, setSubject] = useState("");
+  const [birthday, setBirthday] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -26,8 +27,8 @@ export default function Dashboard() {
 
   async function addStudent() {
     if (!name.trim()) return;
-    await supabase.from("students").insert({ name, grade, subject });
-    setName(""); setGrade(""); setSubject(""); setShowAdd(false);
+    await supabase.from("students").insert({ name, grade, subject, birthday: birthday || null});
+    setName(""); setGrade(""); setSubject(""); setBirthday(""); setShowAdd(false);
     loadStudents();
   }
 
@@ -47,10 +48,7 @@ export default function Dashboard() {
         + Add student
       </button>
 
-      {showAdd && (
-        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
-          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
-                {showAdd && (
+            {showAdd && (
         <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
           <select
@@ -81,10 +79,8 @@ export default function Dashboard() {
             <input placeholder="Type grade" value={grade} onChange={(e) => setGrade(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
           )}
           <input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
-          <button onClick={addStudent} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save</button>
-        </div>
-      )}
-          <input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
+          <label style={{ fontSize: 13, color: "#888" }}>Birthday (optional)</label>
+          <input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
           <button onClick={addStudent} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save</button>
         </div>
       )}

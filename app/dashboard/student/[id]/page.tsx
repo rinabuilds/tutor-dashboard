@@ -124,6 +124,7 @@ export default function StudentDetail() {
 
       <h1 style={{ fontSize: 26 }}>{student.name}</h1>
       <div style={{ color: "#888" }}>{student.grade} · {student.subject}</div>
+      {student.birthday && <div style={{color: "#888", fontSize: 14}}>🎂 Birthday: {student.birthday}</div>}
       <div style={{ marginTop: 8, fontSize: 18 }}>⭐ {student.points || 0} points</div>
 
       <div style={{ ...box, marginTop: 20 }}>
