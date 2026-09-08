@@ -12,7 +12,6 @@ export default function StudentDetail() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [notes, setNotes] = useState("");
 
-  // session form
   const [date, setDate] = useState("");
   const [topic, setTopic] = useState("");
   const [rating, setRating] = useState(3);
@@ -21,7 +20,6 @@ export default function StudentDetail() {
   const [points, setPoints] = useState(5);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // grade form
   const [grades, setGrades] = useState<any[]>([]);
   const [assessment, setAssessment] = useState("");
   const [marks, setMarks] = useState("");
@@ -39,7 +37,7 @@ export default function StudentDetail() {
     const { data: s } = await supabase.from("students").select("*").eq("id", studentId).single();
     setStudent(s);
     setNotes(s?.general_notes || "");
-    const { data: sess } = await supabase.from("sessions").select("*").eq("student_id", studentId).order("date", { ascending: false });
+    const { data: sess } = await supabase.from("sessions").select("*").eq("student_id", studentId).order("created_at", { ascending: false });
     setSessions(sess || []);
     const { data: g } = await supabase.from("grades").select("*").eq("student_id", studentId).order("date", { ascending: false });
     setGrades(g || []);
@@ -109,7 +107,6 @@ export default function StudentDetail() {
     const { error } = await supabase.from("students").delete().eq("id", studentId);
     if (error) {
       alert("Delete failed: " + error.message);
-      console.log("Delete error:", error);
     } else {
       router.push("/dashboard");
     }
@@ -167,6 +164,24 @@ export default function StudentDetail() {
         <input type="date" value={gradeDate} onChange={(e) => setGradeDate(e.target.value)} style={{ ...input, marginTop: 8 }} />
         <button onClick={addGrade} style={{ padding: "8px 16px", background: "#3a5a78", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save grade</button>
       </div>
+
+      <h3>Session history</h3>
+      {sessions.length === 0 && <p style={{ color: "#888" }}>No sessions yet.</p>}
+      {sessions.map((sess) => (
+        <div key={sess.id} style={box}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <strong>{sess.topic}</strong>
+            <span style={{ color: "#888", fontSize: 14 }}>{sess.date}</span>
+          </div>
+          <div style={{ fontSize: 14, color: "#555", margin: "4px 0" }}>Progress: {["", "Needs work", "Developing", "On track", "Strong", "Excellent"][sess.rating]}</div>
+          <p style={{ margin: 0, fontSize: 14 }}>{sess.notes}</p>
+          {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
+          <div style={{ marginTop: 10 }}>
+            <button onClick={() => startEdit(sess)} style={{ padding: "4px 10px", cursor: "pointer", marginRight: 8, fontSize: 13 }}>Edit</button>
+            <button onClick={() => deleteSession(sess.id)} style={{ padding: "4px 10px", cursor: "pointer", fontSize: 13, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 4, background: "#fff" }}>Delete</button>
+          </div>
+        </div>
+      ))}
 
       <h3>Grade history</h3>
       {grades.length === 0 && <p style={{ color: "#888" }}>No grades yet.</p>}
