@@ -8,6 +8,7 @@ export default function Dashboard() {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
+  const [gradeIsOther, setGradeIsOther] = useState(false);
   const [subject, setSubject] = useState("");
   const router = useRouter();
 
@@ -49,7 +50,40 @@ export default function Dashboard() {
       {showAdd && (
         <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
           <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
-          <input placeholder="Grade (e.g. Primary 3)" value={grade} onChange={(e) => setGrade(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
+                {showAdd && (
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
+          <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
+          <select
+            value={gradeIsOther ? "Others" : grade}
+            onChange={(e) => {
+              if (e.target.value === "Others") {
+                setGradeIsOther(true);
+                setGrade("");
+              } else {
+                setGradeIsOther(false);
+                setGrade(e.target.value);
+              }
+            }}
+            style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }}
+          >
+            <option value="">Select grade</option>
+            <option value="K1">K1</option>
+            <option value="K2">K2</option>
+            <option value="Primary 1">Primary 1</option>
+            <option value="Primary 2">Primary 2</option>
+            <option value="Primary 3">Primary 3</option>
+            <option value="Primary 4">Primary 4</option>
+            <option value="Primary 5">Primary 5</option>
+            <option value="Primary 6">Primary 6</option>
+            <option value="Others">Others</option>
+          </select>
+          {gradeIsOther && (
+            <input placeholder="Type grade" value={grade} onChange={(e) => setGrade(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
+          )}
+          <input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
+          <button onClick={addStudent} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save</button>
+        </div>
+      )}
           <input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }} />
           <button onClick={addStudent} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save</button>
         </div>
