@@ -17,6 +17,7 @@ export default function StudentDetail() {
   const [rating, setRating] = useState(3);
   const [sessionNotes, setSessionNotes] = useState("");
   const [homework, setHomework] = useState("");
+  const [sessionType, setSessionType] = useState("1-on-1");
   const [points, setPoints] = useState(5);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -46,10 +47,10 @@ export default function StudentDetail() {
   async function addSession() {
     if (!date || !topic.trim()) return;
     if (editingId) {
-      await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework }).eq("id", editingId);
+      await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework, session_type: sessionType }).eq("id", editingId);
       setEditingId(null);
     } else {
-      await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework });
+      await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework, session_type: sessionType });
       await supabase.from("point_events").insert({ student_id: studentId, amount: points, reason: `Session: ${topic}` });
       await supabase.from("students").update({ points: (student.points || 0) + points }).eq("id", studentId);
     }
@@ -145,6 +146,12 @@ export default function StudentDetail() {
           <option value={4}>Strong</option>
           <option value={5}>Excellent</option>
         </select>
+                <label style={{ fontSize: 14, marginLeft: 16 }}>Type: </label>
+        <select value={sessionType} onChange={(e) => setSessionType(e.target.value)} style={{ padding: 6, marginLeft: 8 }}>
+          <option value="1-on-1">1-on-1</option>
+          <option value="Centre">Centre</option>
+          <option value="Online">Online</option>
+        </select>
         {!editingId && <>
           <label style={{ fontSize: 14, marginLeft: 16 }}>Points: </label>
           <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: 60, padding: 6, marginLeft: 8 }} />
@@ -175,6 +182,8 @@ export default function StudentDetail() {
             <span style={{ color: "#888", fontSize: 14 }}>{sess.date}</span>
           </div>
           <div style={{ fontSize: 14, color: "#555", margin: "4px 0" }}>Progress: {["", "Needs work", "Developing", "On track", "Strong", "Excellent"][sess.rating]}</div>
+                    {sess.session_type && <div style={{ fontSize: 13, color: "#888" }}>Type: {sess.session_type}</div>}
+
           <p style={{ margin: 0, fontSize: 14 }}>{sess.notes}</p>
           {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
           <div style={{ marginTop: 10 }}>
