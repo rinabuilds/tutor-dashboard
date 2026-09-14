@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { supabase } from "../../../../lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 
@@ -26,6 +26,7 @@ export default function StudentDetail() {
   const [marks, setMarks] = useState("");
   const [maxMarks, setMaxMarks] = useState("");
   const [gradeDate, setGradeDate] = useState("");
+  const [showGrades, setShowGrades] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -193,7 +194,10 @@ export default function StudentDetail() {
         </div>
       ))}
 
-      <h3>Grade history</h3>
+                  <h3 onClick={() => setShowGrades(!showGrades)} style={{ cursor: "pointer", userSelect: "none" }}>
+        {showGrades ? "▼" : "▶"} Grade history
+      </h3>
+      {showGrades && (<>
       {grades.length === 0 && <p style={{ color: "#888" }}>No grades yet.</p>}
       {grades.map((g) => {
         const pct = (g.marks != null && g.max_marks) ? Math.round((g.marks / g.max_marks) * 100) : null;
@@ -211,6 +215,7 @@ export default function StudentDetail() {
           </div>
         );
       })}
+      </>)}
     </div>
   );
 }
