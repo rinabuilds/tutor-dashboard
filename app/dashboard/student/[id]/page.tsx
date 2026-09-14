@@ -11,6 +11,7 @@ export default function StudentDetail() {
   const [student, setStudent] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [notes, setNotes] = useState("");
+  const [showSessions, setShowSessions] = useState(false);
 
   const [date, setDate] = useState("");
   const [topic, setTopic] = useState("");
@@ -27,6 +28,7 @@ export default function StudentDetail() {
   const [maxMarks, setMaxMarks] = useState("");
   const [gradeDate, setGradeDate] = useState("");
   const [showGrades, setShowGrades] = useState(false);
+  
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -174,7 +176,10 @@ export default function StudentDetail() {
         <button onClick={addGrade} style={{ padding: "8px 16px", background: "#3a5a78", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save grade</button>
       </div>
 
-      <h3>Session history</h3>
+      <h3 onClick={() => setShowSessions(!showSessions)} style={{ cursor: "pointer", userSelect: "none" }}>
+        {showSessions ? "▼" : "▶"} Session history
+      </h3>
+      {showSessions && (<>
       {sessions.length === 0 && <p style={{ color: "#888" }}>No sessions yet.</p>}
       {sessions.map((sess) => (
         <div key={sess.id} style={box}>
@@ -193,6 +198,7 @@ export default function StudentDetail() {
           </div>
         </div>
       ))}
+            </>)}
 
                   <h3 onClick={() => setShowGrades(!showGrades)} style={{ cursor: "pointer", userSelect: "none" }}>
         {showGrades ? "▼" : "▶"} Grade history
