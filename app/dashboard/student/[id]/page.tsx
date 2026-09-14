@@ -12,6 +12,7 @@ export default function StudentDetail() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [notes, setNotes] = useState("");
   const [showSessions, setShowSessions] = useState(false);
+  const [showSessionForm, setShowSessionForm] = useState(false);
 
   const [date, setDate] = useState("");
   const [topic, setTopic] = useState("");
@@ -137,8 +138,11 @@ export default function StudentDetail() {
         <button onClick={saveNotes} style={{ padding: "6px 14px", cursor: "pointer" }}>Save notes</button>
       </div>
 
-      <div style={box}>
-        <h3>{editingId ? "Edit session" : "Log a session"}</h3>
+            <div style={box}>
+        <h3 onClick={() => setShowSessionForm(!showSessionForm)} style={{ cursor: "pointer", userSelect: "none" }}>
+          {showSessionForm ? "▼" : "▶"} {editingId ? "Edit session" : "Log a session"}
+        </h3>
+        {showSessionForm && (<>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={input} />
         <input placeholder="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} style={input} />
         <label style={{ fontSize: 14 }}>Progress: </label>
@@ -149,7 +153,7 @@ export default function StudentDetail() {
           <option value={4}>Strong</option>
           <option value={5}>Excellent</option>
         </select>
-                <label style={{ fontSize: 14, marginLeft: 16 }}>Type: </label>
+        <label style={{ fontSize: 14, marginLeft: 16 }}>Type: </label>
         <select value={sessionType} onChange={(e) => setSessionType(e.target.value)} style={{ padding: 6, marginLeft: 8 }}>
           <option value="1-on-1">1-on-1</option>
           <option value="Centre">Centre</option>
@@ -163,6 +167,7 @@ export default function StudentDetail() {
         <textarea placeholder="Homework given (e.g. Worksheet pg 12–14)" value={homework} onChange={(e) => setHomework(e.target.value)} style={{ ...input, minHeight: 50, marginTop: 8 }} />
         <button onClick={addSession} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>{editingId ? "Update session" : `Save session (+${points} pts)`}</button>
         {editingId && <button onClick={cancelEdit} style={{ padding: "8px 16px", marginLeft: 8, cursor: "pointer" }}>Cancel</button>}
+        </>)}
       </div>
 
       <div style={box}>
