@@ -21,6 +21,7 @@ export default function StudentDetail() {
   const [homework, setHomework] = useState("");
   const [sessionType, setSessionType] = useState("1-on-1");
   const [points, setPoints] = useState(5);
+  const [paid, setPaid] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [grades, setGrades] = useState<any[]>([]);
@@ -29,6 +30,7 @@ export default function StudentDetail() {
   const [maxMarks, setMaxMarks] = useState("");
   const [gradeDate, setGradeDate] = useState("");
   const [showGrades, setShowGrades] = useState(false);
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -50,10 +52,10 @@ export default function StudentDetail() {
   async function addSession() {
     if (!date || !topic.trim()) return;
     if (editingId) {
-      await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework, session_type: sessionType }).eq("id", editingId);
+            await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework, session_type: sessionType, paid }).eq("id", editingId);
       setEditingId(null);
     } else {
-      await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework, session_type: sessionType });
+            await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework, session_type: sessionType });
       await supabase.from("point_events").insert({ student_id: studentId, amount: points, reason: `Session: ${topic}` });
       await supabase.from("students").update({ points: (student.points || 0) + points }).eq("id", studentId);
     }
@@ -167,6 +169,10 @@ export default function StudentDetail() {
         </>}
         <textarea placeholder="Session notes (parents see these)" value={sessionNotes} onChange={(e) => setSessionNotes(e.target.value)} style={{ ...input, minHeight: 60, marginTop: 8 }} />
         <textarea placeholder="Homework given (e.g. Worksheet pg 12–14)" value={homework} onChange={(e) => setHomework(e.target.value)} style={{ ...input, minHeight: 50, marginTop: 8 }} />
+                <label style={{ display: "block", marginTop: 8, marginBottom: 8, fontSize: 14, cursor: "pointer" }}>
+          <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} style={{ marginRight: 8 }} />
+          Paid
+        </label>
         <button onClick={addSession} style={{ padding: "10px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>{editingId ? "Update session" : `Save session (+${points} pts)`}</button>
         {editingId && <button onClick={cancelEdit} style={{ padding: "10px 16px", marginLeft: 8, cursor: "pointer" }}>Cancel</button>}
         </>)}
@@ -198,6 +204,7 @@ export default function StudentDetail() {
           {sess.session_type && <div style={{ fontSize: 13, color: "#888" }}>Type: {sess.session_type}</div>}
           <p style={{ margin: 0, fontSize: 14 }}>{sess.notes}</p>
           {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
+                    <p style={{ margin: "6px 0 0", fontSize: 14, color: sess.paid ? "#3f8f5b" : "#c0442e", fontWeight: 600 }}>{sess.paid ? "✓ Paid" : "✗ Unpaid"}</p>
           <div style={{ marginTop: 10 }}>
             <button onClick={() => startEdit(sess)} style={{ padding: "4px 10px", cursor: "pointer", marginRight: 8, fontSize: 13 }}>Edit</button>
             <button onClick={() => deleteSession(sess.id)} style={{ padding: "4px 10px", cursor: "pointer", fontSize: 13, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 4, background: "#fff" }}>Delete</button>
