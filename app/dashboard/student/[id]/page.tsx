@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useSyncExternalStore } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../../../lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 
@@ -29,7 +29,6 @@ export default function StudentDetail() {
   const [maxMarks, setMaxMarks] = useState("");
   const [gradeDate, setGradeDate] = useState("");
   const [showGrades, setShowGrades] = useState(false);
-  
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -58,23 +57,25 @@ export default function StudentDetail() {
       await supabase.from("point_events").insert({ student_id: studentId, amount: points, reason: `Session: ${topic}` });
       await supabase.from("students").update({ points: (student.points || 0) + points }).eq("id", studentId);
     }
-    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setPoints(5);
+    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setSessionType("1-on-1"); setPoints(5);
     loadAll();
   }
 
   function startEdit(sess: any) {
     setEditingId(sess.id);
+    setShowSessionForm(true);
     setDate(sess.date);
     setTopic(sess.topic);
     setRating(sess.rating);
     setSessionNotes(sess.notes || "");
     setHomework(sess.homework || "");
+    setSessionType(sess.session_type || "1-on-1");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function cancelEdit() {
     setEditingId(null);
-    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setPoints(5);
+    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setSessionType("1-on-1"); setPoints(5);
   }
 
   async function deleteSession(id: string) {
@@ -121,6 +122,7 @@ export default function StudentDetail() {
 
   const box = { border: "1px solid #eee", borderRadius: 8, padding: 16, marginBottom: 16 };
   const input = { display: "block", width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" as const };
+  const fieldLabel = { fontSize: 14, display: "block", marginTop: 8, marginBottom: 2 };
 
   return (
     <div style={{ maxWidth: 720, margin: "40px auto", fontFamily: "system-ui", padding: 20 }}>
@@ -129,7 +131,7 @@ export default function StudentDetail() {
 
       <h1 style={{ fontSize: 26 }}>{student.name}</h1>
       <div style={{ color: "#888" }}>{student.grade} · {student.subject}</div>
-      {student.birthday && <div style={{color: "#888", fontSize: 14}}>🎂 Birthday: {student.birthday}</div>}
+      {student.birthday && <div style={{ color: "#888", fontSize: 14 }}>🎂 Birthday: {student.birthday}</div>}
       <div style={{ marginTop: 8, fontSize: 18 }}>⭐ {student.points || 0} points</div>
 
       <div style={{ ...box, marginTop: 20 }}>
@@ -138,47 +140,47 @@ export default function StudentDetail() {
         <button onClick={saveNotes} style={{ padding: "6px 14px", cursor: "pointer" }}>Save notes</button>
       </div>
 
-            <div style={box}>
+      <div style={box}>
         <h3 onClick={() => setShowSessionForm(!showSessionForm)} style={{ cursor: "pointer", userSelect: "none" }}>
           {showSessionForm ? "▼" : "▶"} {editingId ? "Edit session" : "Log a session"}
         </h3>
         {showSessionForm && (<>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={input} />
         <input placeholder="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} style={input} />
-        <label style={{ fontSize: 14 }}>Progress: </label>
-        <select value={rating} onChange={(e) => setRating(Number(e.target.value))} style={{ ...input, width: "auto", display: "inline-block", marginLeft: 8 }}>
+        <label style={fieldLabel}>Progress:</label>
+        <select value={rating} onChange={(e) => setRating(Number(e.target.value))} style={input}>
           <option value={1}>Needs work</option>
           <option value={2}>Developing</option>
           <option value={3}>On track</option>
           <option value={4}>Strong</option>
           <option value={5}>Excellent</option>
         </select>
-        <label style={{ fontSize: 14, marginLeft: 16 }}>Type: </label>
-        <select value={sessionType} onChange={(e) => setSessionType(e.target.value)} style={{ padding: 6, marginLeft: 8 }}>
+        <label style={fieldLabel}>Type:</label>
+        <select value={sessionType} onChange={(e) => setSessionType(e.target.value)} style={input}>
           <option value="1-on-1">1-on-1</option>
           <option value="Centre">Centre</option>
           <option value="Online">Online</option>
         </select>
         {!editingId && <>
-          <label style={{ fontSize: 14, marginLeft: 16 }}>Points: </label>
-          <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: 60, padding: 6, marginLeft: 8 }} />
+          <label style={fieldLabel}>Points:</label>
+          <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={input} />
         </>}
         <textarea placeholder="Session notes (parents see these)" value={sessionNotes} onChange={(e) => setSessionNotes(e.target.value)} style={{ ...input, minHeight: 60, marginTop: 8 }} />
         <textarea placeholder="Homework given (e.g. Worksheet pg 12–14)" value={homework} onChange={(e) => setHomework(e.target.value)} style={{ ...input, minHeight: 50, marginTop: 8 }} />
-        <button onClick={addSession} style={{ padding: "8px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>{editingId ? "Update session" : `Save session (+${points} pts)`}</button>
-        {editingId && <button onClick={cancelEdit} style={{ padding: "8px 16px", marginLeft: 8, cursor: "pointer" }}>Cancel</button>}
+        <button onClick={addSession} style={{ padding: "10px 16px", background: "#3f8f5b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>{editingId ? "Update session" : `Save session (+${points} pts)`}</button>
+        {editingId && <button onClick={cancelEdit} style={{ padding: "10px 16px", marginLeft: 8, cursor: "pointer" }}>Cancel</button>}
         </>)}
       </div>
 
       <div style={box}>
         <h3>Add exam / assessment grade</h3>
         <input placeholder="Assessment name (e.g. Term 1 Math Test)" value={assessment} onChange={(e) => setAssessment(e.target.value)} style={input} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <input type="number" placeholder="Marks" value={marks} onChange={(e) => setMarks(e.target.value)} style={{ ...input, marginBottom: 0 }} />
-          <input type="number" placeholder="Out of" value={maxMarks} onChange={(e) => setMaxMarks(e.target.value)} style={{ ...input, marginBottom: 0 }} />
-        </div>
+        <label style={fieldLabel}>Marks:</label>
+        <input type="number" placeholder="Marks" value={marks} onChange={(e) => setMarks(e.target.value)} style={input} />
+        <label style={fieldLabel}>Out of:</label>
+        <input type="number" placeholder="Out of" value={maxMarks} onChange={(e) => setMaxMarks(e.target.value)} style={input} />
         <input type="date" value={gradeDate} onChange={(e) => setGradeDate(e.target.value)} style={{ ...input, marginTop: 8 }} />
-        <button onClick={addGrade} style={{ padding: "8px 16px", background: "#3a5a78", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save grade</button>
+        <button onClick={addGrade} style={{ padding: "10px 16px", background: "#3a5a78", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Save grade</button>
       </div>
 
       <h3 onClick={() => setShowSessions(!showSessions)} style={{ cursor: "pointer", userSelect: "none" }}>
@@ -193,8 +195,7 @@ export default function StudentDetail() {
             <span style={{ color: "#888", fontSize: 14 }}>{sess.date}</span>
           </div>
           <div style={{ fontSize: 14, color: "#555", margin: "4px 0" }}>Progress: {["", "Needs work", "Developing", "On track", "Strong", "Excellent"][sess.rating]}</div>
-                    {sess.session_type && <div style={{ fontSize: 13, color: "#888" }}>Type: {sess.session_type}</div>}
-
+          {sess.session_type && <div style={{ fontSize: 13, color: "#888" }}>Type: {sess.session_type}</div>}
           <p style={{ margin: 0, fontSize: 14 }}>{sess.notes}</p>
           {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
           <div style={{ marginTop: 10 }}>
@@ -203,9 +204,9 @@ export default function StudentDetail() {
           </div>
         </div>
       ))}
-            </>)}
+      </>)}
 
-                  <h3 onClick={() => setShowGrades(!showGrades)} style={{ cursor: "pointer", userSelect: "none" }}>
+      <h3 onClick={() => setShowGrades(!showGrades)} style={{ cursor: "pointer", userSelect: "none" }}>
         {showGrades ? "▼" : "▶"} Grade history
       </h3>
       {showGrades && (<>
