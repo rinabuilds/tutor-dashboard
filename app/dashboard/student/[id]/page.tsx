@@ -30,7 +30,7 @@ export default function StudentDetail() {
   const [maxMarks, setMaxMarks] = useState("");
   const [gradeDate, setGradeDate] = useState("");
   const [showGrades, setShowGrades] = useState(false);
-
+  const [newSubject, setNewSubject] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -52,14 +52,14 @@ export default function StudentDetail() {
   async function addSession() {
     if (!date || !topic.trim()) return;
     if (editingId) {
-            await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework, session_type: sessionType, paid }).eq("id", editingId);
+      await supabase.from("sessions").update({ date, topic, rating, notes: sessionNotes, homework, session_type: sessionType, paid }).eq("id", editingId);
       setEditingId(null);
     } else {
-            await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework, session_type: sessionType });
+      await supabase.from("sessions").insert({ student_id: studentId, date, topic, rating, notes: sessionNotes, homework, session_type: sessionType, paid });
       await supabase.from("point_events").insert({ student_id: studentId, amount: points, reason: `Session: ${topic}` });
       await supabase.from("students").update({ points: (student.points || 0) + points }).eq("id", studentId);
     }
-    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setSessionType("1-on-1"); setPoints(5);
+    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setSessionType("1-on-1"); setPaid(false); setPoints(5);
     loadAll();
   }
 
@@ -72,12 +72,13 @@ export default function StudentDetail() {
     setSessionNotes(sess.notes || "");
     setHomework(sess.homework || "");
     setSessionType(sess.session_type || "1-on-1");
+    setPaid(sess.paid || false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function cancelEdit() {
     setEditingId(null);
-    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setSessionType("1-on-1"); setPoints(5);
+    setDate(""); setTopic(""); setRating(3); setSessionNotes(""); setHomework(""); setSessionType("1-on-1"); setPaid(false); setPoints(5);
   }
 
   async function deleteSession(id: string) {
@@ -110,6 +111,22 @@ export default function StudentDetail() {
     alert("Notes saved!");
   }
 
+  async function addSubject(subj: string) {
+    const clean = subj.trim();
+    if (!clean) return;
+    const current = student.subjects || [];
+    if (current.includes(clean)) return;
+    const updated = [...current, clean];
+    await supabase.from("students").update({ subjects: updated }).eq("id", studentId);
+    loadAll();
+  }
+
+  async function removeSubject(subj: string) {
+    const updated = (student.subjects || []).filter((s: string) => s !== subj);
+    await supabase.from("students").update({ subjects: updated }).eq("id", studentId);
+    loadAll();
+  }
+
   async function deleteStudent() {
     if (!confirm(`Delete ${student.name}? This removes all their sessions and cannot be undone.`)) return;
     const { error } = await supabase.from("students").delete().eq("id", studentId);
@@ -137,6 +154,30 @@ export default function StudentDetail() {
       <div style={{ marginTop: 8, fontSize: 18 }}>⭐ {student.points || 0} points</div>
 
       <div style={{ ...box, marginTop: 20 }}>
+        <h3>Subjects 🍎</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {(student.subjects || []).length === 0 && <span style={{ color: "#888", fontSize: 14 }}>No subjects yet.</span>}
+          {(student.subjects || []).map((subj: string) => (
+            <span key={subj} style={{ background: "#e8eef3", color: "#3a5a78", padding: "4px 10px", borderRadius: 999, fontSize: 14 }}>
+              {subj}
+              <span onClick={() => removeSubject(subj)} style={{ marginLeft: 6, cursor: "pointer", fontWeight: 700 }}>✕</span>
+            </span>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+          {["Math", "Science", "English", "Chinese", "Malay"].map((subj) => (
+            <button key={subj} onClick={() => addSubject(subj)} style={{ padding: "4px 10px", fontSize: 13, borderRadius: 999, border: "1px solid #3a5a78", background: "#fff", color: "#3a5a78", cursor: "pointer" }}>
+              + {subj}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input placeholder="Custom subject" value={newSubject} onChange={(e) => setNewSubject(e.target.value)} style={{ ...input, marginBottom: 0 }} />
+          <button onClick={() => { addSubject(newSubject); setNewSubject(""); }} style={{ padding: "8px 14px", background: "#3a5a78", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Add</button>
+        </div>
+      </div>
+
+      <div style={box}>
         <h3>General notes</h3>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...input, minHeight: 70 }} placeholder="e.g. Responds well to praise, allergic to peanuts..." />
         <button onClick={saveNotes} style={{ padding: "6px 14px", cursor: "pointer" }}>Save notes</button>
@@ -169,7 +210,7 @@ export default function StudentDetail() {
         </>}
         <textarea placeholder="Session notes (parents see these)" value={sessionNotes} onChange={(e) => setSessionNotes(e.target.value)} style={{ ...input, minHeight: 60, marginTop: 8 }} />
         <textarea placeholder="Homework given (e.g. Worksheet pg 12–14)" value={homework} onChange={(e) => setHomework(e.target.value)} style={{ ...input, minHeight: 50, marginTop: 8 }} />
-                <label style={{ display: "block", marginTop: 8, marginBottom: 8, fontSize: 14, cursor: "pointer" }}>
+        <label style={{ display: "block", marginTop: 8, marginBottom: 8, fontSize: 14, cursor: "pointer" }}>
           <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} style={{ marginRight: 8 }} />
           Paid
         </label>
@@ -204,7 +245,7 @@ export default function StudentDetail() {
           {sess.session_type && <div style={{ fontSize: 13, color: "#888" }}>Type: {sess.session_type}</div>}
           <p style={{ margin: 0, fontSize: 14 }}>{sess.notes}</p>
           {sess.homework && <p style={{ margin: "6px 0 0", fontSize: 14, color: "#3a5a78" }}>📚 Homework: {sess.homework}</p>}
-                    <p style={{ margin: "6px 0 0", fontSize: 14, color: sess.paid ? "#3f8f5b" : "#c0442e", fontWeight: 600 }}>{sess.paid ? "✓ Paid" : "✗ Unpaid"}</p>
+          <p style={{ margin: "6px 0 0", fontSize: 14, color: sess.paid ? "#3f8f5b" : "#c0442e", fontWeight: 600 }}>{sess.paid ? "✓ Paid" : "✗ Unpaid"}</p>
           <div style={{ marginTop: 10 }}>
             <button onClick={() => startEdit(sess)} style={{ padding: "4px 10px", cursor: "pointer", marginRight: 8, fontSize: 13 }}>Edit</button>
             <button onClick={() => deleteSession(sess.id)} style={{ padding: "4px 10px", cursor: "pointer", fontSize: 13, color: "#c0442e", border: "1px solid #c0442e", borderRadius: 4, background: "#fff" }}>Delete</button>
