@@ -8,6 +8,7 @@ const MIN_QUESTION_COUNT = 5;
 const MAX_QUESTION_COUNT = 20;
 const QUESTIONS_PER_BATCH = 5;
 const MAX_OUTPUT_TOKENS_PER_BATCH = 768;
+const MAX_OUTPUT_RETRIES = 2;
 
 type OperationChoice = (typeof OPERATIONS)[number];
 type WorksheetQuestion = {
@@ -87,6 +88,7 @@ function validateQuestions(
 function logFailedAIResponse(
   reason: string,
   batchNumber: number,
+  attempt: number,
   response: {
     choices: Array<{ finish_reason: string | null }>;
     usage?: {
@@ -99,6 +101,7 @@ function logFailedAIResponse(
   console.warn("TutorMate AI response could not produce a valid worksheet", {
     reason,
     batchNumber,
+    attempt,
     finishReason: response.choices[0]?.finish_reason ?? null,
     promptTokens: response.usage?.prompt_tokens ?? null,
     completionTokens: response.usage?.completion_tokens ?? null,
@@ -172,63 +175,97 @@ export async function POST(request: Request) {
       const batchNumber = Math.floor(offset / QUESTIONS_PER_BATCH) + 1;
       const batchQuestionCount = Math.min(QUESTIONS_PER_BATCH, questionCount - offset);
       const previousQuestions = questions.map(({ question }) => question);
-      const response = await client.chat.completions.create({
-        model: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
-        messages: [
-          {
-            role: "user",
-            content: `Generate exactly ${batchQuestionCount} different ${level} maths questions. Allowed operations: ${operationChoice}. If Both is selected, use addition and subtraction only. NEVER use multiplication or division. Difficulty: ${difficulty}. Foundation means easier revision, Standard means grade-appropriate, and Challenge means harder questions. For P4 Challenge, use mostly 4- to 5-digit numbers and include regrouping. Do not include reasoning or explanations. Return ONLY valid JSON in this format: {"questions":[{"question":"1234 + 5678 = ?","answer":"6912"}]}. Include exactly ${batchQuestionCount} objects. Do not repeat these questions: ${previousQuestions.join("; ") || "none"}.`,
-          },
-        ],
-        max_tokens: MAX_OUTPUT_TOKENS_PER_BATCH,
-        ...{ chat_template_kwargs: { enable_thinking: false } },
-      });
+      let batchQuestions: WorksheetQuestion[] | null = null;
+      let batchFailureReason = "missing_content";
 
-      const completion = response.choices[0];
-      finishReason = completion?.finish_reason;
-      const content = completion?.message?.content;
-      if (typeof content !== "string") {
-        logFailedAIResponse(
-          completion?.finish_reason === "length" ? "reasoning_or_output_truncated" : "missing_content",
-          batchNumber,
-          response
-        );
-        return NextResponse.json(
-          { error: "The AI returned an incomplete worksheet. Please try again." },
-          { status: 502 }
-        );
+      for (
+        let attempt = 1;
+        attempt <= MAX_OUTPUT_RETRIES + 1 && !batchQuestions;
+        attempt++
+      ) {
+        const retryInstruction =
+          attempt === 1
+            ? ""
+            : " Your previous response did not meet the required format or validation rules. Return one JSON object with a top-level questions array containing exactly the requested number of objects; each object must have only question and answer strings. Include no markdown, commentary, or text outside the JSON.";
+        const response = await client.chat.completions.create({
+          model: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+          messages: [
+            {
+              role: "user",
+              content: `Generate exactly ${batchQuestionCount} different ${level} maths questions. Allowed operations: ${operationChoice}. If Both is selected, use addition and subtraction only. NEVER use multiplication or division. Difficulty: ${difficulty}. Foundation means easier revision, Standard means grade-appropriate, and Challenge means harder questions. For P4 Challenge, use mostly 4- to 5-digit numbers and include regrouping. Do not include reasoning or explanations. Return ONLY valid JSON in this format: {"questions":[{"question":"1234 + 5678 = ?","answer":"6912"}]}. Include exactly ${batchQuestionCount} objects. Do not repeat these questions: ${previousQuestions.join("; ") || "none"}.${retryInstruction}`,
+            },
+          ],
+          max_tokens: MAX_OUTPUT_TOKENS_PER_BATCH,
+          ...{ chat_template_kwargs: { enable_thinking: false } },
+        });
+
+        const completion = response.choices[0];
+        finishReason = completion?.finish_reason;
+        const content = completion?.message?.content;
+        if (typeof content !== "string") {
+          batchFailureReason =
+            completion?.finish_reason === "length"
+              ? "reasoning_or_output_truncated"
+              : "missing_content";
+        } else {
+          let parsed: unknown;
+          let jsonParsed = true;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            jsonParsed = false;
+          }
+
+          if (!jsonParsed) {
+            batchFailureReason = "invalid_json";
+          } else {
+            const validatedQuestions = validateQuestions(
+              parsed,
+              operationChoice,
+              batchQuestionCount
+            );
+            if (!validatedQuestions) {
+              batchFailureReason = "invalid_question_count_or_content";
+            } else {
+              const batchIdentities = new Set<string>();
+              const hasDuplicate = validatedQuestions.some((question) => {
+                const identity = getQuestionIdentity(question.question);
+                if (questionIdentities.has(identity) || batchIdentities.has(identity)) {
+                  return true;
+                }
+                batchIdentities.add(identity);
+                return false;
+              });
+
+              if (hasDuplicate) {
+                batchFailureReason = "duplicate_question";
+              } else {
+                batchQuestions = validatedQuestions;
+              }
+            }
+          }
+        }
+
+        if (!batchQuestions) {
+          logFailedAIResponse(batchFailureReason, batchNumber, attempt, response);
+        }
       }
 
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        logFailedAIResponse("invalid_json", batchNumber, response);
-        return NextResponse.json(
-          { error: "The AI returned an unreadable worksheet. Please try again." },
-          { status: 502 }
-        );
-      }
-
-      const batchQuestions = validateQuestions(parsed, operationChoice, batchQuestionCount);
       if (!batchQuestions) {
-        logFailedAIResponse("invalid_question_count_or_content", batchNumber, response);
-        return NextResponse.json(
-          { error: "The AI returned an invalid worksheet. Please try again." },
-          { status: 502 }
-        );
+        const errorMessage =
+          batchFailureReason === "missing_content" ||
+          batchFailureReason === "reasoning_or_output_truncated"
+            ? "The AI returned an incomplete worksheet. Please try again."
+            : batchFailureReason === "invalid_json"
+              ? "The AI returned an unreadable worksheet. Please try again."
+              : batchFailureReason === "invalid_question_count_or_content"
+                ? "The AI returned an invalid worksheet. Please try again."
+                : "The AI returned duplicate questions. Please try again.";
+        return NextResponse.json({ error: errorMessage }, { status: 502 });
       }
 
       for (const question of batchQuestions) {
-        const identity = getQuestionIdentity(question.question);
-        if (questionIdentities.has(identity)) {
-          logFailedAIResponse("duplicate_question", batchNumber, response);
-          return NextResponse.json(
-            { error: "The AI returned a duplicate question. Please try again." },
-            { status: 502 }
-          );
-        }
-        questionIdentities.add(identity);
+        questionIdentities.add(getQuestionIdentity(question.question));
         questions.push(question);
       }
     }
