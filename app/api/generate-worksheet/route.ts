@@ -2,6 +2,14 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 const LEVELS = ["P1", "P2", "P3", "P4", "P5", "P6"];
+const LEVEL_MAXIMUMS: Record<(typeof LEVELS)[number], number> = {
+  P1: 20,
+  P2: 100,
+  P3: 1000,
+  P4: 10000,
+  P5: 100000,
+  P6: 1000000,
+};
 const DIFFICULTIES = ["Foundation", "Standard", "Challenge"];
 const OPERATIONS = ["Addition", "Subtraction", "Both"];
 const MIN_QUESTION_COUNT = 5;
@@ -114,6 +122,61 @@ function getQuestionIdentity(question: string) {
   return match ? `${Number(match[1])}${match[2]}${Number(match[3])}` : question.trim();
 }
 
+function createFallbackQuestions(
+  questionCount: number,
+  level: (typeof LEVELS)[number],
+  operationChoice: OperationChoice,
+  difficulty: (typeof DIFFICULTIES)[number],
+  existingIdentities: Set<string>
+): WorksheetQuestion[] | null {
+  const levelMaximum = LEVEL_MAXIMUMS[level];
+  const operandMaximum =
+    difficulty === "Foundation" ? Math.max(10, Math.floor(levelMaximum / 10)) : levelMaximum;
+  const operandRange = operandMaximum + 1;
+  const operations = operationChoice === "Both" ? ["+", "-"] : [operationChoice === "Addition" ? "+" : "-"];
+  const identities = new Set(existingIdentities);
+  const questions: WorksheetQuestion[] = [];
+
+  for (let candidateIndex = 0; questions.length < questionCount; candidateIndex++) {
+    if (candidateIndex >= operandRange * operandRange) {
+      return null;
+    }
+
+    for (const operator of operations) {
+      const leftOperand =
+        operator === "+"
+          ? candidateIndex % operandRange
+          : Math.floor(candidateIndex / operandRange);
+      const rightOperand =
+        operator === "+"
+          ? Math.floor(candidateIndex / operandRange)
+          : candidateIndex % operandRange;
+
+      if (operator === "-" && rightOperand > leftOperand) {
+        continue;
+      }
+
+      const question = `${leftOperand} ${operator} ${rightOperand} = ?`;
+      const identity = getQuestionIdentity(question);
+      if (identities.has(identity)) {
+        continue;
+      }
+
+      identities.add(identity);
+      questions.push({
+        question,
+        answer: String(operator === "+" ? leftOperand + rightOperand : leftOperand - rightOperand),
+      });
+
+      if (questions.length === questionCount) {
+        break;
+      }
+    }
+  }
+
+  return questions;
+}
+
 function getSafeErrorDetails(error: unknown) {
   if (!isRecord(error)) {
     return { errorType: "UnknownError" };
@@ -169,6 +232,7 @@ export async function POST(request: Request) {
     });
     const questions: WorksheetQuestion[] = [];
     const questionIdentities = new Set<string>();
+    let fallbackUsed = false;
     let finishReason: string | null | undefined;
 
     for (let offset = 0; offset < questionCount; offset += QUESTIONS_PER_BATCH) {
@@ -186,7 +250,9 @@ export async function POST(request: Request) {
         const retryInstruction =
           attempt === 1
             ? ""
-            : " Your previous response did not meet the required format or validation rules. Return one JSON object with a top-level questions array containing exactly the requested number of objects; each object must have only question and answer strings. Include no markdown, commentary, or text outside the JSON.";
+            : batchFailureReason === "duplicate_question"
+              ? " Your previous response repeated an equation. Return entirely new operand pairs, with no duplicate equations within this response or among the excluded questions. Check each equation for uniqueness before responding."
+              : " Your previous response did not meet the required format or validation rules. Return one JSON object with a top-level questions array containing exactly the requested number of objects; each object must have only question and answer strings. Include no markdown, commentary, or text outside the JSON.";
         const response = await client.chat.completions.create({
           model: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
           messages: [
@@ -246,6 +312,23 @@ export async function POST(request: Request) {
           }
         }
 
+        if (!batchQuestions && batchFailureReason === "duplicate_question") {
+          batchQuestions = createFallbackQuestions(
+            batchQuestionCount,
+            level,
+            operationChoice,
+            difficulty,
+            questionIdentities
+          );
+          if (batchQuestions) {
+            fallbackUsed = true;
+            console.warn("TutorMate used deterministic questions after duplicate AI output", {
+              batchNumber,
+              questionCount: batchQuestionCount,
+            });
+          }
+        }
+
         if (!batchQuestions) {
           logFailedAIResponse(batchFailureReason, batchNumber, attempt, response);
         }
@@ -272,6 +355,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       questions,
+      fallbackUsed,
       finishReason,
     });
   } catch (error) {

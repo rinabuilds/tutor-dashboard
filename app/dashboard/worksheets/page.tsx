@@ -30,6 +30,7 @@ export default function WorksheetsPage() {
   const [questions, setQuestions] = useState<WorksheetQuestion[]>([]);
   const [answerVisible, setAnswerVisible] = useState(false);
   const [error, setError] = useState("");
+  const [generationNotice, setGenerationNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const questionPages = Array.from(
     { length: Math.ceil(questions.length / QUESTIONS_PER_PAGE) },
@@ -43,6 +44,7 @@ export default function WorksheetsPage() {
   async function handleGenerate() {
     setLoading(true);
     setError("");
+    setGenerationNotice("");
 
     try {
       const response = await fetch("/api/generate-worksheet", {
@@ -75,6 +77,16 @@ export default function WorksheetsPage() {
       }
 
       setQuestions(data.questions);
+      const fallbackUsed =
+        typeof data === "object" &&
+        data !== null &&
+        "fallbackUsed" in data &&
+        data.fallbackUsed === true;
+      setGenerationNotice(
+        fallbackUsed
+          ? "Some questions were created with a backup generator after the AI repeated questions."
+          : ""
+      );
     } catch (generationError) {
       setQuestions([]);
       setError(
@@ -186,6 +198,11 @@ export default function WorksheetsPage() {
           {error && (
             <p className="worksheet-error" role="alert">
               {error}
+            </p>
+          )}
+          {generationNotice && (
+            <p className="worksheet-notice" role="status">
+              {generationNotice}
             </p>
           )}
         </div>
@@ -303,12 +320,19 @@ export default function WorksheetsPage() {
               id="worksheet-answer-key"
               aria-labelledby="answer-key-title"
             >
-              <h2 id="answer-key-title">
-                Answer key <span aria-hidden="true">🗝️</span>
-              </h2>
+              <header className="answer-key-header">
+                <p className="print-kicker">TutorMate · Teacher copy</p>
+                <h2 id="answer-key-title">Answer key</h2>
+                <p>
+                  {level} · {operationChoice} · {questions.length} questions
+                </p>
+              </header>
               <ol>
                 {questions.map((question, index) => (
-                  <li key={index}>{question.answer}</li>
+                  <li key={index}>
+                    <span className="answer-number">{index + 1}.</span>
+                    <span>{question.answer}</span>
+                  </li>
                 ))}
               </ol>
             </section>

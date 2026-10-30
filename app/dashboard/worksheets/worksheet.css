@@ -197,6 +197,16 @@
   line-height: 1.5;
 }
 
+.worksheet-notice {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border: 1px solid #d6e4d4;
+  border-radius: 12px;
+  background: #f4f8f2;
+  color: #405d48;
+  line-height: 1.5;
+}
+
 .worksheet-preview {
   margin-top: 28px;
   padding: clamp(18px, 4vw, 32px);
@@ -435,8 +445,24 @@
   padding: 24px 30px;
 }
 
-.answer-key h2 {
+.answer-key-header {
   margin-bottom: 12px;
+}
+
+.answer-key-header .print-kicker {
+  margin-bottom: 5px;
+}
+
+.answer-key-header h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.55rem;
+}
+
+.answer-key-header p:last-child {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .answer-key ol {
@@ -446,6 +472,16 @@
   padding-left: 24px;
   color: #4d5a50;
   line-height: 1.5;
+}
+
+.answer-key li {
+  padding-left: 4px;
+}
+
+.answer-number {
+  display: inline-block;
+  min-width: 2rem;
+  font-weight: 700;
 }
 
 @media (max-width: 640px) {
@@ -511,7 +547,9 @@
   }
 
   .worksheet-print,
-  .worksheet-print * {
+  .worksheet-print *,
+  .answer-key,
+  .answer-key * {
     visibility: visible !important;
   }
 
@@ -673,8 +711,7 @@
   }
 
   .worksheet-builder,
-  .preview-heading,
-  .answer-key {
+  .preview-heading {
     display: none !important;
   }
 
@@ -687,5 +724,61 @@
   .worksheet-preview {
     display: contents;
     visibility: visible;
+  }
+
+  .answer-key {
+    display: block !important;
+    box-sizing: border-box;
+    width: 100%;
+    height: 281mm;
+    min-height: 0;
+    margin: 0;
+    padding: 8mm;
+    border: 0;
+    border-radius: 0;
+    background: #fff !important;
+    box-shadow: none;
+    color: #000 !important;
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .answer-key-header {
+    margin-bottom: 8mm;
+    padding-bottom: 4mm;
+    border-bottom: 1px solid #777;
+  }
+
+  .answer-key-header .print-kicker,
+  .answer-key-header h2,
+  .answer-key-header p:last-child,
+  .answer-key ol {
+    color: #000 !important;
+  }
+
+  .answer-key-header h2 {
+    font-size: 22pt;
+  }
+
+  .answer-key-header p:last-child {
+    font-size: 10pt;
+  }
+
+  .answer-key ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2mm 8mm;
+    padding-left: 8mm;
+    font-size: 12pt;
+  }
+
+  .answer-key li {
+    padding: 1mm 0;
+    border-bottom: 1px solid #ddd;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .answer-number {
+    min-width: 12mm;
   }
 }
