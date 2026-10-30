@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TutorMate
 
-## Getting Started
+TutorMate helps tutors manage student records, track lessons and assessment results, and prepare maths practice in one dashboard.
 
-First, run the development server:
+## Live demo
+
+[Open TutorMate](https://tutor-dashboard-eta.vercel.app)
+
+Authentication is required. Sign in using a configured Supabase account. The current app does not include a public sign-up page. Demo student records are fictional.
+
+## Features
+
+- Student profiles, subjects, learning levels, and notes.
+- Lesson history, progress ratings, homework, points, and payment status.
+- Assessment marks and grade history.
+- Maths worksheets for Primary 1–6 with selectable operations, difficulty, and question count.
+- Printable worksheets and an optional answer key.
+
+## NVIDIA and Nebius integration
+
+The worksheet generator calls **NVIDIA Nemotron through Nebius Token Factory**.
+
+- **Model:** `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`
+- **Endpoint:** `https://api.tokenfactory.nebius.com/v1/`
+- **Implementation:** [Worksheet API route](app/api/generate-worksheet/route.ts)
+
+The authenticated server route sends the chosen level, operations, difficulty, and question count to the model. It validates the returned JSON, arithmetic answers, question count, and duplicate equations.
+
+Duplicate model output may trigger a deterministic backup generator. The interface displays a notice when that backup is used.
+
+The generation prompt does not send student names, birthdays, or lesson notes. The Nebius API key stays on the server.
+
+## Technology
+
+Next.js, React, TypeScript, Supabase authentication/database, Nebius Token Factory, NVIDIA Nemotron, and Vercel hosting.
+
+## Local setup
+
+Requires Node.js, npm, a Nebius API key with access to the configured model, and a provisioned Supabase project with a sign-in account.
+
+```bash
+git clone https://github.com/rinabuilds/tutor-dashboard.git
+cd tutor-dashboard
+npm ci
+```
+
+Create `.env.local` in the project root:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_KEY=your_supabase_public_client_key
+NEBIUS_API_KEY=your_nebius_api_key
+```
+
+Keep this file out of version control. Use a Supabase publishable or anon key for the public client key, not a service-role secret.
+
+The dashboard requires Supabase tables named `students`, `sessions`, `grades`, and `point_events`, with the columns referenced by the dashboard pages. Database migrations and security policies are not bundled in this repository yet, so a fresh database needs provisioning. The hosted demo uses an existing configured database.
+
+Start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [localhost:3000](http://localhost:3000), sign in, and select **Create Worksheet**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Other available commands:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run build
+npm start
+```
 
-## Learn More
+## License
 
-To learn more about Next.js, take a look at the following resources:
+[MIT License](LICENSE)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Copyright (c) 2026 Arina Aizin.
