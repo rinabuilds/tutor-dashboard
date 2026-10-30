@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "../../../lib/supabase-server";
 
 const LEVELS = ["P1", "P2", "P3", "P4", "P5", "P6"];
 const LEVEL_MAXIMUMS: Record<(typeof LEVELS)[number], number> = {
@@ -203,6 +204,13 @@ function getSafeErrorDetails(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
   let input: unknown;
   try {
     input = await request.json();
