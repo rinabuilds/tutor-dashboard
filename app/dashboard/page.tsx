@@ -43,7 +43,20 @@ export default function Dashboard() {
         <h1 style={{ fontSize: 26 }}>My Students</h1>
         <button onClick={logout} style={{ padding: "6px 12px", cursor: "pointer" }}>Log out</button>
       </div>
-
+    <button
+  onClick={() => router.push("/dashboard/worksheets")}
+  style={{
+    padding: "10px 16px",
+    marginBottom: 16,
+    backgroundColor: "#3f8f5b",
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+  }}
+>
+  🌿 Create Worksheet
+</button>
       <button onClick={() => setShowAdd(!showAdd)} style={{ padding: "8px 16px", marginTop: 12, background: "#3a5a78", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
         + Add student
       </button>
