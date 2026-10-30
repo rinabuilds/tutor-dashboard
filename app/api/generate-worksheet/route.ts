@@ -6,6 +6,8 @@ const DIFFICULTIES = ["Foundation", "Standard", "Challenge"];
 const OPERATIONS = ["Addition", "Subtraction", "Both"];
 const MIN_QUESTION_COUNT = 5;
 const MAX_QUESTION_COUNT = 20;
+const QUESTIONS_PER_BATCH = 5;
+const MAX_OUTPUT_TOKENS_PER_BATCH = 768;
 
 type OperationChoice = (typeof OPERATIONS)[number];
 type WorksheetQuestion = {
@@ -84,17 +86,29 @@ function validateQuestions(
 
 function logFailedAIResponse(
   reason: string,
+  batchNumber: number,
   response: {
     choices: Array<{ finish_reason: string | null }>;
-    usage?: { prompt_tokens: number; completion_tokens: number } | null;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      completion_tokens_details?: { reasoning_tokens?: number } | null;
+    } | null;
   }
 ) {
   console.warn("TutorMate AI response could not produce a valid worksheet", {
     reason,
+    batchNumber,
     finishReason: response.choices[0]?.finish_reason ?? null,
     promptTokens: response.usage?.prompt_tokens ?? null,
     completionTokens: response.usage?.completion_tokens ?? null,
+    reasoningTokens: response.usage?.completion_tokens_details?.reasoning_tokens ?? null,
   });
+}
+
+function getQuestionIdentity(question: string) {
+  const match = question.match(/^\s*(\d+)\s*([+-])\s*(\d+)\s*=\s*\?\s*$/);
+  return match ? `${Number(match[1])}${match[2]}${Number(match[3])}` : question.trim();
 }
 
 function getSafeErrorDetails(error: unknown) {
@@ -150,49 +164,78 @@ export async function POST(request: Request) {
       apiKey: process.env.NEBIUS_API_KEY,
       baseURL: "https://api.tokenfactory.nebius.com/v1/",
     });
-    const response = await client.chat.completions.create({
-      model: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
-      messages: [
-        {
-          role: "user",
-content: `Generate exactly ${questionCount} different ${level} maths questions. Allowed operations: ${operationChoice}. If Both is selected, use addition and subtraction only. NEVER use multiplication or division. Difficulty: ${difficulty}. Foundation means easier revision, Standard means grade-appropriate, and Challenge means harder questions. For P4 Challenge, use mostly 4- to 5-digit numbers and include regrouping. Return ONLY valid JSON in this format: {"questions":[{"question":"1234 + 5678 = ?","answer":"6912"}]}. Include exactly ${questionCount} objects. No markdown or explanations.`,
-        },
-      ],
-      max_tokens: 3000,
-    });
+    const questions: WorksheetQuestion[] = [];
+    const questionIdentities = new Set<string>();
+    let finishReason: string | null | undefined;
 
-    const content = response.choices[0]?.message?.content;
-    if (typeof content !== "string") {
-      logFailedAIResponse("missing_content", response);
-      return NextResponse.json(
-        { error: "The AI returned an incomplete worksheet. Please try again." },
-        { status: 502 }
-      );
-    }
+    for (let offset = 0; offset < questionCount; offset += QUESTIONS_PER_BATCH) {
+      const batchNumber = Math.floor(offset / QUESTIONS_PER_BATCH) + 1;
+      const batchQuestionCount = Math.min(QUESTIONS_PER_BATCH, questionCount - offset);
+      const previousQuestions = questions.map(({ question }) => question);
+      const response = await client.chat.completions.create({
+        model: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        messages: [
+          {
+            role: "user",
+            content: `Generate exactly ${batchQuestionCount} different ${level} maths questions. Allowed operations: ${operationChoice}. If Both is selected, use addition and subtraction only. NEVER use multiplication or division. Difficulty: ${difficulty}. Foundation means easier revision, Standard means grade-appropriate, and Challenge means harder questions. For P4 Challenge, use mostly 4- to 5-digit numbers and include regrouping. Do not include reasoning or explanations. Return ONLY valid JSON in this format: {"questions":[{"question":"1234 + 5678 = ?","answer":"6912"}]}. Include exactly ${batchQuestionCount} objects. Do not repeat these questions: ${previousQuestions.join("; ") || "none"}.`,
+          },
+        ],
+        max_tokens: MAX_OUTPUT_TOKENS_PER_BATCH,
+        ...{ chat_template_kwargs: { enable_thinking: false } },
+      });
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      logFailedAIResponse("invalid_json", response);
-      return NextResponse.json(
-        { error: "The AI returned an unreadable worksheet. Please try again." },
-        { status: 502 }
-      );
-    }
+      const completion = response.choices[0];
+      finishReason = completion?.finish_reason;
+      const content = completion?.message?.content;
+      if (typeof content !== "string") {
+        logFailedAIResponse(
+          completion?.finish_reason === "length" ? "reasoning_or_output_truncated" : "missing_content",
+          batchNumber,
+          response
+        );
+        return NextResponse.json(
+          { error: "The AI returned an incomplete worksheet. Please try again." },
+          { status: 502 }
+        );
+      }
 
-    const questions = validateQuestions(parsed, operationChoice, questionCount);
-    if (!questions) {
-      logFailedAIResponse("invalid_question_count_or_content", response);
-      return NextResponse.json(
-        { error: "The AI returned an invalid worksheet. Please try again." },
-        { status: 502 }
-      );
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        logFailedAIResponse("invalid_json", batchNumber, response);
+        return NextResponse.json(
+          { error: "The AI returned an unreadable worksheet. Please try again." },
+          { status: 502 }
+        );
+      }
+
+      const batchQuestions = validateQuestions(parsed, operationChoice, batchQuestionCount);
+      if (!batchQuestions) {
+        logFailedAIResponse("invalid_question_count_or_content", batchNumber, response);
+        return NextResponse.json(
+          { error: "The AI returned an invalid worksheet. Please try again." },
+          { status: 502 }
+        );
+      }
+
+      for (const question of batchQuestions) {
+        const identity = getQuestionIdentity(question.question);
+        if (questionIdentities.has(identity)) {
+          logFailedAIResponse("duplicate_question", batchNumber, response);
+          return NextResponse.json(
+            { error: "The AI returned a duplicate question. Please try again." },
+            { status: 502 }
+          );
+        }
+        questionIdentities.add(identity);
+        questions.push(question);
+      }
     }
 
     return NextResponse.json({
       questions,
-      finishReason: response.choices[0]?.finish_reason,
+      finishReason,
     });
   } catch (error) {
     console.error("TutorMate Nebius API request failed", getSafeErrorDetails(error));
